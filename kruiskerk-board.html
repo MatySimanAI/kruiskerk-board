@@ -114,6 +114,7 @@
   const STOP_ID    = "NL:S:57243210";
   const FEED_URL   = `https://drgl.nl/stop/${STOP_ID}/departurespanel`;
   const PLACEHOLDER = "—:—";
+  const WALK_TIME_MIN = 1;  // shift displayed times earlier so "now" = leave-the-house
   const LINES = new Set(["178", "357"]);
   const NORTHBOUND_HINT = "Amsterdam";
   const SUFFIXES_TO_STRIP = new Set(["Amsterdam", "Amstelveen", "Busst.", "Busstation"]);
@@ -244,16 +245,24 @@
     return out;
   }
 
+  function shiftTime(hhmm, deltaMin) {
+    const [h, m] = hhmm.split(":").map(Number);
+    let mins = (h * 60 + m + deltaMin + 24 * 60) % (24 * 60);
+    return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  }
+
   function bucketize(items) {
     const out = { "178_north": [], "178_south": [], "357_north": [], "357_south": [] };
     for (const d of items) {
       if (!LINES.has(d.line)) continue;
-      // drgl.nl keeps just-departed buses around for a grace period; skip them.
-      if (minutesUntil(d.time) < 0) continue;
+      const displayTime = shiftTime(d.time, -WALK_TIME_MIN);
+      // drgl.nl keeps just-departed buses around for a grace period; also drop
+      // any whose shifted (leave-the-house) time has already passed.
+      if (minutesUntil(displayTime) < 0) continue;
       const dir = d.dest.includes(NORTHBOUND_HINT) ? "north" : "south";
       const key = `${d.line}_${dir}`;
       if (out[key].length >= 2) continue;
-      out[key].push({ time: d.time, destination: shortenDestination(d.dest) });
+      out[key].push({ time: displayTime, destination: shortenDestination(d.dest) });
     }
     return out;
   }
