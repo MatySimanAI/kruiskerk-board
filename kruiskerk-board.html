@@ -178,8 +178,10 @@
 
   function render(buckets) {
     for (const sec of SECTIONS) {
-      // Per-section: collect cell+minutes pairs so we can mark the soonest.
+      // Per-section: collect cell+minutes pairs so we can mark the soonest,
+      // and track the soonest-per-row so we can reorder rows.
       const candidates = [];
+      const rowSoonest = Object.fromEntries(sec.keys.map((k) => [k, Infinity]));
       for (const key of sec.keys) {
         const row = main.querySelector(`.row[data-key="${key}"]`);
         const entries = buckets[key] || [];
@@ -193,7 +195,10 @@
             cell.textContent = e.time;
             cell.classList.remove("empty");
             const m = minutesUntil(e.time);
-            if (m >= 0) candidates.push({ cell, m });
+            if (m >= 0) {
+              candidates.push({ cell, m });
+              if (m < rowSoonest[key]) rowSoonest[key] = m;
+            }
           } else {
             cell.textContent = PLACEHOLDER;
             cell.classList.add("empty");
@@ -203,6 +208,16 @@
       if (candidates.length) {
         candidates.sort((a, b) => a.m - b.m);
         candidates[0].cell.classList.add("next");
+      }
+
+      // Reorder rows in this section so the line whose next bus is soonest
+      // sits on top. Empty rows (Infinity) sink to the bottom.
+      const sortedKeys = [...sec.keys].sort(
+        (a, b) => rowSoonest[a] - rowSoonest[b]
+      );
+      const sectionEl = main.querySelector(`.row[data-key="${sec.keys[0]}"]`).parentElement;
+      for (const key of sortedKeys) {
+        sectionEl.appendChild(sectionEl.querySelector(`.row[data-key="${key}"]`));
       }
     }
   }
