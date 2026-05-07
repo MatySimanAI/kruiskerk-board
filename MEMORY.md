@@ -1,0 +1,1 @@
+- [Amstelveen Kruiskerk bus departures](reference_amstelveen_kruiskerk_bus.md) — WebFetch drgl.nl/stop/NL:S:57243210 for live next-bus board; user lives in Amstelveen

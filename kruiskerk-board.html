@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kruiskerk · Departures</title>
+<style>
+  :root {
+    --black: #000;
+    --white: #fff;
+    --gray:  #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 800px;
+    height: 480px;
+    background: var(--white);
+    color: var(--black);
+    font-family: -apple-system, "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-weight: 900;
+    font-feature-settings: "tnum";
+    -webkit-font-smoothing: none;
+    overflow: hidden;
+  }
+  body {
+    padding: 18px 28px 14px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--black);
+  }
+  .stop-name { font-size: 38px; letter-spacing: 1px; line-height: 1; }
+  .time-block { text-align: right; }
+  .now {
+    font-size: 38px;
+    letter-spacing: 1px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .updated   { font-size: 16px; color: var(--gray); font-weight: 700; margin-top: 4px; }
+  .updated.stale { color: var(--black); }
+
+  section { padding-top: 14px; }
+  .section-label {
+    font-size: 22px;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .arrow { font-size: 24px; line-height: 1; }
+  .divider {
+    border-top: 2px solid var(--black);
+    margin-bottom: 6px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 96px 1fr 150px 150px;
+    align-items: center;
+    column-gap: 18px;
+    padding: 6px 0;
+  }
+  .badge {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 88px;
+    height: 52px;
+    background: var(--black);
+    color: var(--white);
+    border-radius: 8px;
+    font-size: 32px;
+    letter-spacing: 1px;
+  }
+  .destination {
+    font-size: 24px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .time {
+    font-size: 38px;
+    font-weight: 900;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .time.empty { color: var(--gray); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="stop-name">KRUISKERK</div>
+  <div class="time-block">
+    <div class="now" id="now">--:--</div>
+    <div class="updated" id="updated">loading…</div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<script>
+  // ---- config ----
+  const STOP_ID    = "NL:S:57243210";
+  const FEED_URL   = `https://drgl.nl/stop/${STOP_ID}/departurespanel`;
+  const PLACEHOLDER = "—:—";
+  const LINES = new Set(["178", "357"]);
+  const NORTHBOUND_HINT = "Amsterdam";
+  const SUFFIXES_TO_STRIP = new Set(["Amsterdam", "Amstelveen", "Busst.", "Busstation"]);
+
+  // drgl.nl has no CORS headers, so route through a public CORS proxy.
+  // Try them in order; first success wins.
+  const PROXIES = [
+    (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
+    (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  ];
+
+  const SECTIONS = [
+    { direction: "TO AMSTERDAM",  arrow: "↑", keys: ["178_north", "357_north"] },
+    { direction: "TO AMSTELVEEN", arrow: "↓", keys: ["178_south", "357_south"] },
+  ];
+
+  // ---- DOM scaffolding ----
+  const main = document.getElementById("main");
+  const updatedEl = document.getElementById("updated");
+  const nowEl = document.getElementById("now");
+
+  function buildSkeleton() {
+    main.innerHTML = "";
+    for (const sec of SECTIONS) {
+      const el = document.createElement("section");
+      el.innerHTML = `
+        <div class="section-label">
+          <span class="arrow">${sec.arrow}</span>
+          <span>${sec.direction}</span>
+        </div>
+        <div class="divider"></div>
+      `;
+      for (const key of sec.keys) {
+        const line = key.split("_")[0];
+        const row = document.createElement("div");
+        row.className = "row";
+        row.dataset.key = key;
+        row.innerHTML = `
+          <div class="badge">${line}</div>
+          <div class="destination" data-field="dest"></div>
+          <div class="time empty" data-field="t0">${PLACEHOLDER}</div>
+          <div class="time empty" data-field="t1">${PLACEHOLDER}</div>
+        `;
+        el.appendChild(row);
+      }
+      main.appendChild(el);
+    }
+  }
+
+  function render(buckets) {
+    for (const sec of SECTIONS) {
+      for (const key of sec.keys) {
+        const row = main.querySelector(`.row[data-key="${key}"]`);
+        const entries = buckets[key] || [];
+        row.querySelector('[data-field="dest"]').textContent =
+          entries[0]?.destination || "";
+        for (const idx of [0, 1]) {
+          const cell = row.querySelector(`[data-field="t${idx}"]`);
+          const e = entries[idx];
+          if (e) {
+            cell.textContent = e.time;
+            cell.classList.remove("empty");
+          } else {
+            cell.textContent = PLACEHOLDER;
+            cell.classList.add("empty");
+          }
+        }
+      }
+    }
+  }
+
+  // ---- fetching + parsing drgl.nl ----
+  function shortenDestination(dest) {
+    const parts = dest.trim().split(/\s+/);
+    while (parts.length && SUFFIXES_TO_STRIP.has(parts[parts.length - 1])) {
+      parts.pop();
+    }
+    return parts.join(" ") || dest;
+  }
+
+  function parseDeparturePanel(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const items = doc.querySelectorAll(".list-group-item");
+    const out = [];
+    for (const it of items) {
+      const time = it.querySelector(".ott-departure-time")?.textContent.trim() || "";
+      const line = it.querySelector(".ott-linecode")?.textContent.trim() || "";
+      const dest = it.querySelector(".ott-destination")?.textContent.trim() || "";
+      if (time && line) out.push({ time, line, dest });
+    }
+    return out;
+  }
+
+  function bucketize(items) {
+    const out = { "178_north": [], "178_south": [], "357_north": [], "357_south": [] };
+    for (const d of items) {
+      if (!LINES.has(d.line)) continue;
+      const dir = d.dest.includes(NORTHBOUND_HINT) ? "north" : "south";
+      const key = `${d.line}_${dir}`;
+      if (out[key].length >= 2) continue;
+      out[key].push({ time: d.time, destination: shortenDestination(d.dest) });
+    }
+    return out;
+  }
+
+  async function fetchViaProxies(url) {
+    let lastErr;
+    for (const wrap of PROXIES) {
+      try {
+        const res = await fetch(wrap(url), { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return await res.text();
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr ?? new Error("all proxies failed");
+  }
+
+  function nowHHMM() {
+    return new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
+    });
+  }
+
+  let lastGoodAt = null;
+
+  async function refresh() {
+    nowEl.textContent = nowHHMM();
+    try {
+      const html = await fetchViaProxies(FEED_URL);
+      const items = parseDeparturePanel(html);
+      render(bucketize(items));
+      lastGoodAt = nowHHMM();
+      updatedEl.textContent = `updated ${lastGoodAt}`;
+      updatedEl.classList.remove("stale");
+    } catch (err) {
+      updatedEl.textContent = lastGoodAt
+        ? `stale · last ${lastGoodAt}`
+        : `offline`;
+      updatedEl.classList.add("stale");
+    }
+  }
+
+  // Schedule the next tick at the next wall-clock minute boundary (HH:MM:00).
+  // Each tick recomputes the delay, so any drift self-corrects.
+  function msUntilNextMinute() {
+    const now = new Date();
+    return 60_000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+  }
+  async function tick() {
+    try { await refresh(); }
+    finally { setTimeout(tick, msUntilNextMinute()); }
+  }
+
+  buildSkeleton();
+  tick();
+</script>
+</body>
+</html>
