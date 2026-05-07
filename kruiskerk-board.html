@@ -164,14 +164,16 @@
   }
 
   function minutesUntil(hhmm) {
+    // Compare minute LABELS, not raw timestamps. A bus listed as HH:MM is
+    // "happening now" (diff = 0) for the entire HH:MM:00–HH:MM:59 window;
+    // it only becomes "past" once the wall clock rolls into the next minute.
     const [h, m] = hhmm.split(":").map(Number);
     const now = new Date();
-    const target = new Date(now);
-    target.setHours(h, m, 0, 0);
-    let diff = target - now;
-    // Wrap past midnight: a "00:05" shown at "23:55" is tomorrow.
-    if (diff < -12 * 60 * 60 * 1000) diff += 24 * 60 * 60 * 1000;
-    return diff / 60_000;
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    let diff = (h * 60 + m) - nowMin;
+    // Wrap past midnight: "00:05" shown at "23:55" is tomorrow.
+    if (diff < -12 * 60) diff += 24 * 60;
+    return diff;
   }
 
   function render(buckets) {
