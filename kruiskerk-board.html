@@ -115,6 +115,7 @@
   const FEED_URL   = `https://drgl.nl/stop/${STOP_ID}/departurespanel`;
   const PLACEHOLDER = "—:—";
   const WALK_TIME_MIN = 1;  // shift displayed times earlier so "now" = leave-the-house
+  const LATE_GRACE_MIN = 1; // keep buses visible this many minutes past displayed time
   const LINES = new Set(["178", "357"]);
   const NORTHBOUND_HINT = "Amsterdam";
   const SUFFIXES_TO_STRIP = new Set(["Amsterdam", "Amstelveen", "Busst.", "Busstation"]);
@@ -196,7 +197,7 @@
             cell.textContent = e.time;
             cell.classList.remove("empty");
             const m = minutesUntil(e.time);
-            if (m >= 0) {
+            if (m >= -LATE_GRACE_MIN) {
               candidates.push({ cell, m });
               if (m < rowSoonest[key]) rowSoonest[key] = m;
             }
@@ -237,7 +238,10 @@
     const items = doc.querySelectorAll(".list-group-item");
     const out = [];
     for (const it of items) {
-      const time = it.querySelector(".ott-departure-time")?.textContent.trim() || "";
+      // drgl.nl decorates delays as "19:05 +3" — keep only the HH:MM part.
+      const timeRaw = it.querySelector(".ott-departure-time")?.textContent ?? "";
+      const timeMatch = timeRaw.match(/(\d{1,2}):(\d{2})/);
+      const time = timeMatch ? `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}` : "";
       const line = it.querySelector(".ott-linecode")?.textContent.trim() || "";
       const dest = it.querySelector(".ott-destination")?.textContent.trim() || "";
       if (time && line) out.push({ time, line, dest });
@@ -256,9 +260,9 @@
     for (const d of items) {
       if (!LINES.has(d.line)) continue;
       const displayTime = shiftTime(d.time, -WALK_TIME_MIN);
-      // drgl.nl keeps just-departed buses around for a grace period; also drop
-      // any whose shifted (leave-the-house) time has already passed.
-      if (minutesUntil(displayTime) < 0) continue;
+      // Keep buses for LATE_GRACE_MIN minutes past their displayed time, in
+      // case they're running late and still going to show up.
+      if (minutesUntil(displayTime) < -LATE_GRACE_MIN) continue;
       const dir = d.dest.includes(NORTHBOUND_HINT) ? "north" : "south";
       const key = `${d.line}_${dir}`;
       if (out[key].length >= 2) continue;
