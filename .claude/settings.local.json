@@ -19,7 +19,9 @@
       "Bash(curl -sD- -o /tmp/proxytest.html \"https://api.codetabs.com/v1/proxy/?quest=https://drgl.nl/stop/NL:S:57243210/departurespanel\")",
       "Bash(command -v gh git)",
       "Bash(gh auth *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(curl *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
