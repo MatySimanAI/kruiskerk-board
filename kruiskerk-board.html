@@ -132,6 +132,16 @@
     { direction: "TO AMSTERDAM", arrow: "↑", keys: ["178_north", "357_north"] },
   ];
 
+  // Canonical destination per (line, direction) — pinned so the row label
+  // doesn't flicker between e.g. "Aalsmeer" and "Kudelstaart" when the
+  // next-departing 357 happens to be a short-run.
+  const CANONICAL_DEST = {
+    "178_north": "Station Zuid",
+    "178_south": "Poortwachter",
+    "357_north": "Elandsgracht",
+    "357_south": "Aalsmeer",
+  };
+
   // ---- DOM scaffolding ----
   const main = document.getElementById("main");
   const updatedEl = document.getElementById("updated");
@@ -188,7 +198,7 @@
         const row = main.querySelector(`.row[data-key="${key}"]`);
         const entries = buckets[key] || [];
         row.querySelector('[data-field="dest"]').textContent =
-          entries[0]?.destination || "";
+          CANONICAL_DEST[key] || "";
         for (const idx of [0, 1]) {
           const cell = row.querySelector(`[data-field="t${idx}"]`);
           cell.classList.remove("next");
@@ -238,10 +248,18 @@
     const items = doc.querySelectorAll(".list-group-item");
     const out = [];
     for (const it of items) {
-      // drgl.nl decorates delays as "19:05 +3" — keep only the HH:MM part.
-      const timeRaw = it.querySelector(".ott-departure-time")?.textContent ?? "";
-      const timeMatch = timeRaw.match(/(\d{1,2}):(\d{2})/);
-      const time = timeMatch ? `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}` : "";
+      const timeEl = it.querySelector(".ott-departure-time");
+      // drgl.nl uses HH:MM as scheduled time, with an optional " ±N" delay.
+      // Real-time expected arrival is HH:MM + delay. A "VERTROKKEN" badge or
+      // the "ott-tripstatus-passed" class means the bus has already left.
+      const cls = timeEl?.className || "";
+      if (cls.includes("ott-tripstatus-passed")) continue;
+      const timeRaw = timeEl?.textContent ?? "";
+      const timeMatch = timeRaw.match(/(\d{1,2}):(\d{2})(?:\s*([+-]\d+))?/);
+      if (!timeMatch) continue;
+      const scheduled = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
+      const delay = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+      const time = shiftTime(scheduled, delay);  // real-time expected arrival
       const line = it.querySelector(".ott-linecode")?.textContent.trim() || "";
       const dest = it.querySelector(".ott-destination")?.textContent.trim() || "";
       if (time && line) out.push({ time, line, dest });
