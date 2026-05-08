@@ -1,2 +1,5 @@
 .gh_token
 .DS_Store
+.claude/
+MEMORY.md
+reference_*.md
