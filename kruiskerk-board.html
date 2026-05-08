@@ -3,238 +3,161 @@
 <head>
 <meta charset="utf-8">
 <title>Kruiskerk · Departures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
   :root {
-    --black: #000;
-    --white: #fff;
-    --gray:  #888;
+    --bg:        #000;
+    --amber:     #ffb000;
+    --amber-dim: #6b4a00;
+    --bezel:     #1a1a1a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     width: 800px;
     height: 480px;
-    background: var(--white);
-    color: var(--black);
-    font-family: -apple-system, "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
-    font-weight: 900;
-    font-feature-settings: "tnum";
+    background: var(--bezel);
+    color: var(--amber);
+    font-family: "VT323", "Courier New", monospace;
     -webkit-font-smoothing: none;
     overflow: hidden;
   }
-  body {
-    padding: 18px 28px 14px;
+  body { padding: 14px; }
+
+  .panel {
+    background: var(--bg);
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    padding: 12px 22px 10px;
     display: flex;
     flex-direction: column;
   }
 
   header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding-bottom: 10px;
-    border-bottom: 3px solid var(--black);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: end;
+    column-gap: 28px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--amber);
   }
-  .stop-name { font-size: 38px; letter-spacing: 1px; line-height: 1; }
-  .time-block { text-align: right; }
-  .now {
-    font-size: 38px;
-    letter-spacing: 1px;
+  .clock {
+    font-size: 50px;
     line-height: 1;
-    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
   }
-  .updated   { font-size: 16px; color: var(--gray); font-weight: 700; margin-top: 4px; }
-  .updated.stale { color: var(--black); }
+  .col-headers {
+    display: grid;
+    grid-template-columns: 90px 1fr 170px;
+    column-gap: 18px;
+    font-size: 22px;
+    line-height: 1;
+    padding-bottom: 4px;
+  }
+  .col-headers .vertrek { text-align: right; }
 
-  section { padding-top: 14px; }
+  main { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+
+  .section { padding-top: 4px; }
   .section-label {
     font-size: 22px;
-    letter-spacing: 1px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 6px;
+    line-height: 1;
+    padding-bottom: 4px;
   }
-  .arrow { font-size: 24px; line-height: 1; }
-  .divider {
-    border-top: 2px solid var(--black);
-    margin-bottom: 6px;
-  }
-
   .row {
     display: grid;
-    grid-template-columns: 96px 1fr 150px 150px;
-    align-items: center;
+    grid-template-columns: 90px 1fr 170px;
     column-gap: 18px;
-    padding: 6px 0;
-  }
-  .badge {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 88px;
-    height: 52px;
-    background: var(--black);
-    color: var(--white);
-    border-radius: 8px;
+    align-items: baseline;
     font-size: 32px;
-    letter-spacing: 1px;
+    line-height: 1.0;
+    padding: 1px 0;
   }
-  .destination {
-    font-size: 24px;
-    font-weight: 800;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .time {
-    font-size: 38px;
-    font-weight: 900;
+  .row .bus      { letter-spacing: 1px; }
+  .row .vertrek  { text-align: right; }
+  .row.placeholder .bus,
+  .row.placeholder .richting,
+  .row.placeholder .vertrek { color: var(--amber-dim); }
+
+  .footer {
+    margin-top: auto;
+    font-size: 16px;
+    color: var(--amber-dim);
     text-align: right;
-    font-variant-numeric: tabular-nums;
     line-height: 1;
   }
-  .time.empty { color: var(--gray); }
-  .time.next  { color: #d40000; }
+  .footer.stale { color: var(--amber); }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="stop-name">KRUISKERK</div>
-  <div class="time-block">
-    <div class="now" id="now">--:--</div>
-    <div class="updated" id="updated">loading…</div>
-  </div>
-</header>
+<div class="panel">
+  <header>
+    <div class="clock" id="clock">--:--</div>
+    <div class="col-headers">
+      <span>Bus</span>
+      <span>Richting</span>
+      <span class="vertrek">Vertrek (min)</span>
+    </div>
+  </header>
 
-<main id="main"></main>
+  <main>
+    <section class="section" data-dir="south">
+      <div class="section-label">&rarr; School</div>
+      <div class="rows" id="rows-south"></div>
+    </section>
+    <section class="section" data-dir="north">
+      <div class="section-label">&rarr; Amsterdam</div>
+      <div class="rows" id="rows-north"></div>
+    </section>
+  </main>
+
+  <div class="footer" id="footer">loading&hellip;</div>
+</div>
 
 <script>
   // ---- config ----
-  const STOP_ID    = "NL:S:57243210";
-  const FEED_URL   = `https://drgl.nl/stop/${STOP_ID}/departurespanel`;
-  const PLACEHOLDER = "—:—";
-  const WALK_TIME_MIN = 1;  // shift displayed times earlier so "now" = leave-the-house
-  const LATE_GRACE_MIN = 1; // keep buses visible this many minutes past displayed time
-  const LINES = new Set(["178", "357"]);
+  const STOP_ID         = "NL:S:57243210";
+  const FEED_URL        = `https://drgl.nl/stop/${STOP_ID}/departurespanel`;
+  const WALK_TIME_MIN   = 1;   // shift earlier so countdown = leave-the-house
+  const LATE_GRACE_MIN  = 1;   // keep buses visible this many min past displayed time
+  const MAX_PER_DIR     = 4;   // rows shown per direction panel
+  const LINES           = new Set(["178", "357"]);
   const NORTHBOUND_HINT = "Amsterdam";
-  const SUFFIXES_TO_STRIP = new Set(["Amsterdam", "Amstelveen", "Busst.", "Busstation"]);
+  const SUFFIXES_TO_STRIP = new Set([
+    "Amsterdam", "Amstelveen", "Busst.", "Busstation", "Bilderdammerweg",
+  ]);
 
-  // drgl.nl has no CORS headers, so route through a public CORS proxy.
-  // Try them in order; first success wins.
+  // drgl.nl has no CORS headers; route through public CORS proxies.
   const PROXIES = [
     (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
     (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   ];
 
-  const SECTIONS = [
-    { direction: "TO SCHOOL",    arrow: "↓", keys: ["178_south", "357_south"] },
-    { direction: "TO AMSTERDAM", arrow: "↑", keys: ["178_north", "357_north"] },
-  ];
+  const clockEl  = document.getElementById("clock");
+  const footerEl = document.getElementById("footer");
+  const rowsSouth = document.getElementById("rows-south");
+  const rowsNorth = document.getElementById("rows-north");
 
-  // Canonical destination per (line, direction) — pinned so the row label
-  // doesn't flicker between e.g. "Aalsmeer" and "Kudelstaart" when the
-  // next-departing 357 happens to be a short-run.
-  const CANONICAL_DEST = {
-    "178_north": "Station Zuid",
-    "178_south": "Poortwachter",
-    "357_north": "Elandsgracht",
-    "357_south": "Aalsmeer",
-  };
-
-  // ---- DOM scaffolding ----
-  const main = document.getElementById("main");
-  const updatedEl = document.getElementById("updated");
-  const nowEl = document.getElementById("now");
-
-  function buildSkeleton() {
-    main.innerHTML = "";
-    for (const sec of SECTIONS) {
-      const el = document.createElement("section");
-      el.innerHTML = `
-        <div class="section-label">
-          <span class="arrow">${sec.arrow}</span>
-          <span>${sec.direction}</span>
-        </div>
-        <div class="divider"></div>
-      `;
-      for (const key of sec.keys) {
-        const line = key.split("_")[0];
-        const row = document.createElement("div");
-        row.className = "row";
-        row.dataset.key = key;
-        row.innerHTML = `
-          <div class="badge">${line}</div>
-          <div class="destination" data-field="dest"></div>
-          <div class="time empty" data-field="t0">${PLACEHOLDER}</div>
-          <div class="time empty" data-field="t1">${PLACEHOLDER}</div>
-        `;
-        el.appendChild(row);
-      }
-      main.appendChild(el);
-    }
+  // ---- helpers ----
+  function shiftTime(hhmm, deltaMin) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const mins = (h * 60 + m + deltaMin + 24 * 60) % (24 * 60);
+    return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
   }
 
   function minutesUntil(hhmm) {
-    // Compare minute LABELS, not raw timestamps. A bus listed as HH:MM is
-    // "happening now" (diff = 0) for the entire HH:MM:00–HH:MM:59 window;
-    // it only becomes "past" once the wall clock rolls into the next minute.
+    // Compare minute LABELS, so HH:MM stays "now" through HH:MM:59.
     const [h, m] = hhmm.split(":").map(Number);
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
     let diff = (h * 60 + m) - nowMin;
-    // Wrap past midnight: "00:05" shown at "23:55" is tomorrow.
     if (diff < -12 * 60) diff += 24 * 60;
     return diff;
   }
 
-  function render(buckets) {
-    for (const sec of SECTIONS) {
-      // Per-section: collect cell+minutes pairs so we can mark the soonest,
-      // and track the soonest-per-row so we can reorder rows.
-      const candidates = [];
-      const rowSoonest = Object.fromEntries(sec.keys.map((k) => [k, Infinity]));
-      for (const key of sec.keys) {
-        const row = main.querySelector(`.row[data-key="${key}"]`);
-        const entries = buckets[key] || [];
-        row.querySelector('[data-field="dest"]').textContent =
-          CANONICAL_DEST[key] || "";
-        for (const idx of [0, 1]) {
-          const cell = row.querySelector(`[data-field="t${idx}"]`);
-          cell.classList.remove("next");
-          const e = entries[idx];
-          if (e) {
-            cell.textContent = e.time;
-            cell.classList.remove("empty");
-            const m = minutesUntil(e.time);
-            if (m >= -LATE_GRACE_MIN) {
-              candidates.push({ cell, m });
-              if (m < rowSoonest[key]) rowSoonest[key] = m;
-            }
-          } else {
-            cell.textContent = PLACEHOLDER;
-            cell.classList.add("empty");
-          }
-        }
-      }
-      if (candidates.length) {
-        candidates.sort((a, b) => a.m - b.m);
-        candidates[0].cell.classList.add("next");
-      }
-
-      // Reorder rows in this section so the line whose next bus is soonest
-      // sits on top. Empty rows (Infinity) sink to the bottom.
-      const sortedKeys = [...sec.keys].sort(
-        (a, b) => rowSoonest[a] - rowSoonest[b]
-      );
-      const sectionEl = main.querySelector(`.row[data-key="${sec.keys[0]}"]`).parentElement;
-      for (const key of sortedKeys) {
-        sectionEl.appendChild(sectionEl.querySelector(`.row[data-key="${key}"]`));
-      }
-    }
-  }
-
-  // ---- fetching + parsing drgl.nl ----
   function shortenDestination(dest) {
     const parts = dest.trim().split(/\s+/);
     while (parts.length && SUFFIXES_TO_STRIP.has(parts[parts.length - 1])) {
@@ -243,23 +166,34 @@
     return parts.join(" ") || dest;
   }
 
+  function nowHHMM() {
+    return new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
+    });
+  }
+
+  function formatVertrek(m) {
+    if (m <= 0) return "Nu";
+    return String(m);
+  }
+
+  // ---- fetching + parsing drgl.nl ----
   function parseDeparturePanel(html) {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const items = doc.querySelectorAll(".list-group-item");
     const out = [];
     for (const it of items) {
       const timeEl = it.querySelector(".ott-departure-time");
-      // drgl.nl uses HH:MM as scheduled time, with an optional " ±N" delay.
-      // Real-time expected arrival is HH:MM + delay. A "VERTROKKEN" badge or
-      // the "ott-tripstatus-passed" class means the bus has already left.
       const cls = timeEl?.className || "";
+      // VERTROKKEN / passed buses are gone; skip them.
       if (cls.includes("ott-tripstatus-passed")) continue;
       const timeRaw = timeEl?.textContent ?? "";
+      // "HH:MM" with optional " ±N" delay → real-time expected arrival.
       const timeMatch = timeRaw.match(/(\d{1,2}):(\d{2})(?:\s*([+-]\d+))?/);
       if (!timeMatch) continue;
       const scheduled = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
       const delay = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
-      const time = shiftTime(scheduled, delay);  // real-time expected arrival
+      const time = shiftTime(scheduled, delay);
       const line = it.querySelector(".ott-linecode")?.textContent.trim() || "";
       const dest = it.querySelector(".ott-destination")?.textContent.trim() || "";
       if (time && line) out.push({ time, line, dest });
@@ -267,24 +201,19 @@
     return out;
   }
 
-  function shiftTime(hhmm, deltaMin) {
-    const [h, m] = hhmm.split(":").map(Number);
-    let mins = (h * 60 + m + deltaMin + 24 * 60) % (24 * 60);
-    return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-  }
-
   function bucketize(items) {
-    const out = { "178_north": [], "178_south": [], "357_north": [], "357_south": [] };
+    const out = [];
     for (const d of items) {
       if (!LINES.has(d.line)) continue;
       const displayTime = shiftTime(d.time, -WALK_TIME_MIN);
-      // Keep buses for LATE_GRACE_MIN minutes past their displayed time, in
-      // case they're running late and still going to show up.
       if (minutesUntil(displayTime) < -LATE_GRACE_MIN) continue;
       const dir = d.dest.includes(NORTHBOUND_HINT) ? "north" : "south";
-      const key = `${d.line}_${dir}`;
-      if (out[key].length >= 2) continue;
-      out[key].push({ time: displayTime, destination: shortenDestination(d.dest) });
+      out.push({
+        time: displayTime,
+        line: d.line,
+        dir,
+        dest: shortenDestination(d.dest),
+      });
     }
     return out;
   }
@@ -303,33 +232,61 @@
     throw lastErr ?? new Error("all proxies failed");
   }
 
-  function nowHHMM() {
-    return new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam",
-    });
-  }
-
-  let lastGoodAt = null;
-
-  async function refresh() {
-    nowEl.textContent = nowHHMM();
-    try {
-      const html = await fetchViaProxies(FEED_URL);
-      const items = parseDeparturePanel(html);
-      render(bucketize(items));
-      lastGoodAt = nowHHMM();
-      updatedEl.textContent = `updated ${lastGoodAt}`;
-      updatedEl.classList.remove("stale");
-    } catch (err) {
-      updatedEl.textContent = lastGoodAt
-        ? `stale · last ${lastGoodAt}`
-        : `offline`;
-      updatedEl.classList.add("stale");
+  // ---- rendering ----
+  function renderDirection(rowsEl, items) {
+    rowsEl.innerHTML = "";
+    const sorted = items
+      .map((e) => ({ ...e, m: minutesUntil(e.time) }))
+      .sort((a, b) => a.m - b.m)
+      .slice(0, MAX_PER_DIR);
+    for (const e of sorted) {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `
+        <span class="bus">${e.line}</span>
+        <span class="richting">${e.dest}</span>
+        <span class="vertrek">${formatVertrek(e.m)}</span>
+      `;
+      rowsEl.appendChild(row);
+    }
+    while (rowsEl.children.length < MAX_PER_DIR) {
+      const row = document.createElement("div");
+      row.className = "row placeholder";
+      row.innerHTML = `<span class="bus">&mdash;</span><span class="richting">&mdash;</span><span class="vertrek">&mdash;</span>`;
+      rowsEl.appendChild(row);
     }
   }
 
-  // Schedule the next tick at the next wall-clock minute boundary (HH:MM:00).
-  // Each tick recomputes the delay, so any drift self-corrects.
+  function render(items) {
+    renderDirection(rowsSouth, items.filter((e) => e.dir === "south"));
+    renderDirection(rowsNorth, items.filter((e) => e.dir === "north"));
+  }
+
+  // ---- refresh loop ----
+  let lastGoodAt = null;
+  let lastItems  = null;
+
+  async function refresh() {
+    clockEl.textContent = nowHHMM();
+    try {
+      const html = await fetchViaProxies(FEED_URL);
+      const parsed = parseDeparturePanel(html);
+      lastItems = bucketize(parsed);
+      render(lastItems);
+      lastGoodAt = nowHHMM();
+      footerEl.textContent = `bijgewerkt ${lastGoodAt}`;
+      footerEl.classList.remove("stale");
+    } catch (err) {
+      // Re-render last data so the countdown keeps ticking even when offline.
+      if (lastItems) render(lastItems);
+      footerEl.textContent = lastGoodAt
+        ? `verouderd · laatst ${lastGoodAt}`
+        : `offline`;
+      footerEl.classList.add("stale");
+    }
+  }
+
+  // Top-of-minute scheduling, self-correcting against drift.
   function msUntilNextMinute() {
     const now = new Date();
     return 60_000 - (now.getSeconds() * 1000 + now.getMilliseconds());
@@ -339,7 +296,6 @@
     finally { setTimeout(tick, msUntilNextMinute()); }
   }
 
-  buildSkeleton();
   tick();
 </script>
 </body>
