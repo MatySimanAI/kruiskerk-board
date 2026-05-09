@@ -12,7 +12,7 @@
     --bg:        #000;
     --amber:     #ffb000;
     --amber-dim: #6b4a00;
-    --bezel:     #1a1a1a;
+    --bezel:     #000;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html {
@@ -29,19 +29,21 @@
     font-family: "VT323", "Courier New", monospace;
     -webkit-font-smoothing: none;
     overflow: hidden;
-    /* Centers the fixed-size body inside whatever viewport we have. */
-    display: grid;
-    place-items: center;
+    position: relative;
   }
   body {
     /* The design is fixed at 800×480 (e-ink panel size). On smaller or
-       portrait screens the JS fit() below applies a transform to scale
-       and/or rotate this body so it always reads as landscape. */
+       portrait screens the JS fit() below applies a transform that scales,
+       rotates if needed, and translates so the body sticks to the top of
+       the visible viewport and is centered horizontally. */
     width: 800px;
     height: 480px;
     padding: 14px;
     background: var(--bezel);
-    transform-origin: center center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
   }
 
   .panel {
@@ -318,17 +320,31 @@
   tick();
 
   // ---- always-landscape fit ----
-  // Keep the 800×480 design intact, but on portrait phones rotate the body 90°
-  // and on small screens scale it down to fit. So the layout always reads as
-  // landscape regardless of how the device is held.
+  // The design is fixed at 800×480 with transform-origin top-left. On portrait
+  // phones we rotate the body 90° so it reads as landscape; on small screens
+  // we scale it down to fit. Translate so the body sticks to the top of the
+  // visible viewport and is centered horizontally.
   function fit() {
     const dw = 800, dh = 480;
-    const portrait = window.innerHeight > window.innerWidth;
-    const availW = portrait ? window.innerHeight : window.innerWidth;
-    const availH = portrait ? window.innerWidth  : window.innerHeight;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const portrait = vh > vw;
+    const availW = portrait ? vh : vw;
+    const availH = portrait ? vw : vh;
     const scale = Math.min(availW / dw, availH / dh, 1);
-    document.body.style.transform =
-      `${portrait ? "rotate(90deg) " : ""}scale(${scale})`;
+    let transform;
+    if (portrait) {
+      // After rotating 90° around top-left, the body sits in negative-X,
+      // positive-Y space; translate right by its post-rotation width to
+      // bring it on-screen, plus extra to horizontally center it.
+      const visualW = dh * scale;        // post-rotation width = original height
+      const tx = (vw - visualW) / 2 + visualW;
+      transform = `translate(${tx}px, 0) rotate(90deg) scale(${scale})`;
+    } else {
+      const visualW = dw * scale;
+      const tx = (vw - visualW) / 2;
+      transform = `translate(${tx}px, 0) scale(${scale})`;
+    }
+    document.body.style.transform = transform;
   }
   window.addEventListener("resize", fit);
   window.addEventListener("orientationchange", fit);
