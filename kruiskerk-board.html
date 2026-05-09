@@ -16,8 +16,14 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html {
+    /* dvw/dvh track the *visible* viewport on mobile (URL bar excluded);
+       100vh on iOS Safari reports the largest possible height which leaves
+       the body offset/cut off when the URL bar is showing. vw/vh kept as a
+       fallback for older browsers that ignore dvh. */
     width: 100vw;
+    width: 100dvw;
     height: 100vh;
+    height: 100dvh;
     background: var(--bezel);
     color: var(--amber);
     font-family: "VT323", "Courier New", monospace;
