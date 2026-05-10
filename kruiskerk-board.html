@@ -110,6 +110,41 @@
     line-height: 1;
   }
   .footer.stale { color: var(--amber); }
+
+  /* Portrait phone: drop the fixed 800×480 box, lay the panel out natively
+     with a tighter grid. The fit() JS skips its transform in portrait, so
+     CSS owns the layout. Landscape is unchanged. */
+  @media (orientation: portrait) {
+    body {
+      width: 100dvw;
+      height: 100dvh;
+      position: static;
+      padding: 8px;
+    }
+    .panel {
+      padding: 10px 14px;
+      border-radius: 4px;
+    }
+    header {
+      column-gap: 14px;
+    }
+    .clock { font-size: 38px; }
+    .col-headers {
+      grid-template-columns: 56px 1fr 64px;
+      column-gap: 10px;
+      font-size: 16px;
+    }
+    .col-headers .vertrek-full { display: none; }
+    .col-headers .vertrek-short { display: inline; }
+    .row {
+      grid-template-columns: 56px 1fr 64px;
+      column-gap: 10px;
+      font-size: 26px;
+    }
+    .section-label { font-size: 18px; padding-bottom: 2px; }
+    .footer { font-size: 13px; }
+  }
+  .col-headers .vertrek-short { display: none; }
 </style>
 </head>
 <body>
@@ -120,7 +155,7 @@
     <div class="col-headers">
       <span>Bus</span>
       <span>Richting</span>
-      <span class="vertrek">Vertrek (min)</span>
+      <span class="vertrek"><span class="vertrek-full">Vertrek (min)</span><span class="vertrek-short">min</span></span>
     </div>
   </header>
 
@@ -319,32 +354,23 @@
 
   tick();
 
-  // ---- always-landscape fit ----
-  // The design is fixed at 800×480 with transform-origin top-left. On portrait
-  // phones we rotate the body 90° so it reads as landscape; on small screens
-  // we scale it down to fit. Translate so the body sticks to the top of the
-  // visible viewport and is centered horizontally.
+  // ---- landscape fit ----
+  // Landscape: scale the fixed 800×480 design and translate so it sticks to
+  // the top of the visible viewport, centered horizontally.
+  // Portrait: skip the transform entirely — a CSS @media block lays the
+  // panel out natively with tighter columns.
   function fit() {
     const dw = 800, dh = 480;
     const vw = window.innerWidth, vh = window.innerHeight;
     const portrait = vh > vw;
-    const availW = portrait ? vh : vw;
-    const availH = portrait ? vw : vh;
-    const scale = Math.min(availW / dw, availH / dh, 1);
-    let transform;
     if (portrait) {
-      // After rotating 90° around top-left, the body sits in negative-X,
-      // positive-Y space; translate right by its post-rotation width to
-      // bring it on-screen, plus extra to horizontally center it.
-      const visualW = dh * scale;        // post-rotation width = original height
-      const tx = (vw - visualW) / 2 + visualW;
-      transform = `translate(${tx}px, 0) rotate(90deg) scale(${scale})`;
-    } else {
-      const visualW = dw * scale;
-      const tx = (vw - visualW) / 2;
-      transform = `translate(${tx}px, 0) scale(${scale})`;
+      document.body.style.transform = "none";
+      return;
     }
-    document.body.style.transform = transform;
+    const scale = Math.min(vw / dw, vh / dh, 1);
+    const visualW = dw * scale;
+    const tx = (vw - visualW) / 2;
+    document.body.style.transform = `translate(${tx}px, 0) scale(${scale})`;
   }
   window.addEventListener("resize", fit);
   window.addEventListener("orientationchange", fit);
