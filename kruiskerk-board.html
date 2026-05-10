@@ -111,9 +111,14 @@
   }
   .footer.stale { color: var(--amber); }
 
+  /* Default for the column-header swap (must be declared before the @media
+     block so the portrait override actually wins). */
+  .col-headers .vertrek-short { display: none; }
+  .col-headers .vertrek-full  { display: inline; }
+
   /* Portrait phone: drop the fixed 800×480 box, lay the panel out natively
-     with a tighter grid. The fit() JS skips its transform in portrait, so
-     CSS owns the layout. Landscape is unchanged. */
+     with a tighter grid and larger fonts so the table fills the viewport.
+     The fit() JS skips its transform in portrait, so CSS owns the layout. */
   @media (orientation: portrait) {
     body {
       width: 100dvw;
@@ -122,29 +127,33 @@
       padding: 8px;
     }
     .panel {
-      padding: 10px 14px;
+      padding: 14px 16px;
       border-radius: 4px;
     }
     header {
-      column-gap: 14px;
+      column-gap: 16px;
+      padding-bottom: 8px;
     }
-    .clock { font-size: 38px; }
+    .clock { font-size: 60px; }
     .col-headers {
-      grid-template-columns: 56px 1fr 64px;
+      grid-template-columns: 70px 1fr 70px;
       column-gap: 10px;
-      font-size: 16px;
+      font-size: 22px;
+      padding-bottom: 6px;
     }
-    .col-headers .vertrek-full { display: none; }
+    .col-headers .vertrek-full  { display: none; }
     .col-headers .vertrek-short { display: inline; }
+    main { gap: 10px; flex: 1; }
+    .section { padding-top: 8px; }
+    .section-label { font-size: 26px; padding-bottom: 6px; }
     .row {
-      grid-template-columns: 56px 1fr 64px;
+      grid-template-columns: 70px 1fr 70px;
       column-gap: 10px;
-      font-size: 26px;
+      font-size: 38px;
+      padding: 6px 0;
     }
-    .section-label { font-size: 18px; padding-bottom: 2px; }
-    .footer { font-size: 13px; }
+    .footer { font-size: 16px; }
   }
-  .col-headers .vertrek-short { display: none; }
 </style>
 </head>
 <body>
